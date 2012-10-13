@@ -1,5 +1,6 @@
 -module(message_router).
 -export([register/2, unregister/1, start/0, stop/0, login/4, get_user_with_password/2, loop/1, logout/1]).
+-export([send_message/3]).
 -define(SERVER, message_router).
 
 start() ->
@@ -17,6 +18,9 @@ register(Uid, Password) ->
 		{ok, created} ->
 			{ok, created}
 	end.
+
+send_message(ToUid, MessageBody, SenderNickname) ->
+	?SERVER ! {send_msg, ToUid, MessageBody, SenderNickname}.
 
 unregister(Uid) ->
 	?SERVER ! {unregister, Uid, self()},
@@ -62,8 +66,8 @@ loop(Members) ->
 		{login, Uid, Password, Nickname, ClientPid, From} ->
 			case get_user_with_password(Uid, Password) of
 				{ok, valid} ->										
-					From !{ok, logged_in},
-					loop(dict:store(Uid, {ClientPid, Nickname}, Members));					
+					From !{ok, logged_in},					
+					loop(dict:store(Uid, {ClientPid, Nickname}, Members));										
 				invalid ->
 					From ! {error, invalid_uid_or_pwd},
 					loop(Members)
@@ -71,7 +75,7 @@ loop(Members) ->
 		{logout, Uid, From} ->
 			io:format("Arrived ~n"),
 			case dict:find(Uid, Members) of
-				{ok, {ClientPid, Nickname}} ->
+				{ok, {ClientPid, _Nickname}} ->
 					ClientPid ! stop,
 					From ! {ok, logged_out},
 					loop(dict:erase(Uid, Members));
@@ -81,7 +85,16 @@ loop(Members) ->
 				Oops -> 
 					io:format("Invalid Message ~p~n", [Oops]),
 					loop(Members)
-			end;			
+			end;
+		{send_msg, ToUid, MessageBody, SenderNickname} ->
+			case dict:find(ToUid, Members) of 
+				{ok, {ClientPid, _Nickname}} ->
+					ClientPid ! {print_msg, MessageBody, SenderNickname},
+					loop(Members);
+				error ->
+					io:format("[Invalid Member] No such user exists ~p~n", [ToUid]),
+					loop(Members)
+			end;
 		shutdown -> 
 			ok;
 		Oops -> 
