@@ -19,8 +19,8 @@ register(Uid, Password) ->
 			{ok, created}
 	end.
 
-send_message(ToUid, MessageBody, SenderNickname) ->
-	?SERVER ! {send_msg, ToUid, MessageBody, SenderNickname}.
+send_message(ToUid, FromUid, MessageBody) ->
+	?SERVER ! {send_msg, ToUid, MessageBody, FromUid}.
 
 unregister(Uid) ->
 	?SERVER ! {unregister, Uid, self()},
@@ -86,15 +86,21 @@ loop(Members) ->
 					io:format("Invalid Message ~p~n", [Oops]),
 					loop(Members)
 			end;
-		{send_msg, ToUid, MessageBody, SenderNickname} ->
-			case dict:find(ToUid, Members) of 
-				{ok, {ClientPid, _Nickname}} ->
-					ClientPid ! {print_msg, MessageBody, SenderNickname},
-					loop(Members);
-				error ->
-					io:format("[Invalid Member] No such user exists ~p~n", [ToUid]),
+		{send_msg, ToUid, MessageBody, FromUid} ->
+			case dict:find(FromUid, Members) of
+				{ok, {_SenderClientPid, SenderNickname}} ->
+					case dict:find(ToUid, Members) of 
+						{ok, {ToClientPid, _ToNickname}} ->
+							ToClientPid ! {print_msg, MessageBody, SenderNickname},
+							loop(Members);
+						error ->
+							io:format("[Invalid Member] No such user exists ~p~n", [ToUid]),
+							loop(Members)
+					end;
+				error -> 
+					io:format("Sender not logged in ~p", [FromUid]),
 					loop(Members)
-			end;
+			end;			
 		shutdown -> 
 			ok;
 		Oops -> 

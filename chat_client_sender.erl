@@ -1,6 +1,7 @@
 -module(chat_client_sender).
 -export([start/0, stop/0, add_sender/2, loop/1, get_sender/1, send_message/2]).
 -define(SERVER, chat_client_sender).
+% -define(SENDER_SERVER, chat_client_sender_2).
 
 
 start() ->
@@ -23,7 +24,8 @@ loop(MemberPids) ->
 	receive
 		{add_sender, SenderPid, {Uid, Nickname}} ->
 			case dict:find(SenderPid, MemberPids) of
-				{ok, {Uid, Nickname}} ->					
+				{ok, {_Uid, _Nickname}} ->	
+					io:format("Pid exists ~n"),				
 					loop(MemberPids);
 				error ->
 					loop(dict:store(SenderPid, {Uid, Nickname}, MemberPids))
